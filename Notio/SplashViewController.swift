@@ -19,22 +19,38 @@ class SplashViewController: UIViewController {
         return layer
     }()
 
+    private let mascotImageView: UIImageView = {
+        let imageView = UIImageView(image: UIImage(named: "nio-hi"))
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+
     private let logoLabel: UILabel = {
         let label = UILabel()
         label.text = "Notio"
-        label.font = UIFont.systemFont(ofSize: 44, weight: .bold)
-        label.textColor = .black
+        label.font = UIFont.systemFont(ofSize: 44, weight: .heavy)
+        label.textColor = UIColor(red: 0.10, green: 0.09, blue: 0.14, alpha: 1.0)
+        label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
 
     private let descriptionLabel: UILabel = {
         let label = UILabel()
-        label.text = "강의 자료를 똑똑한 노트로,\nAI와 함께하는 스마트 학습"
-        label.font = UIFont.systemFont(ofSize: 14, weight: .regular)
-        label.textColor = .darkGray
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
+        paragraphStyle.lineSpacing = 4
+        label.attributedText = NSAttributedString(
+            string: "강의 자료를 똑똑한 노트로,\nAI와 함께하는 스마트 학습",
+            attributes: [
+                .font: UIFont.systemFont(ofSize: 14, weight: .regular),
+                .foregroundColor: UIColor(red: 0.43, green: 0.39, blue: 0.48, alpha: 1.0),
+                .paragraphStyle: paragraphStyle
+            ]
+        )
         label.numberOfLines = 0
-        label.textAlignment = .left
+        label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
@@ -43,21 +59,27 @@ class SplashViewController: UIViewController {
         super.viewDidLoad()
         view.layer.insertSublayer(gradientLayer, at: 0)
 
-        view.addSubview(logoLabel)
-        view.addSubview(descriptionLabel)
+        let stack = UIStackView(arrangedSubviews: [mascotImageView, logoLabel, descriptionLabel])
+        stack.axis = .vertical
+        stack.alignment = .center
+        stack.spacing = 0
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.setCustomSpacing(28, after: mascotImageView)
+        stack.setCustomSpacing(12, after: logoLabel)
+        view.addSubview(stack)
 
-        // 디자인: 로고가 화면 하단 1/3 지점, 왼쪽 정렬
         NSLayoutConstraint.activate([
-            logoLabel.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -view.bounds.height * 0.28),
-            logoLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 36),
+            stack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -24),
 
-            descriptionLabel.topAnchor.constraint(equalTo: logoLabel.bottomAnchor, constant: 10),
-            descriptionLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 36),
-            descriptionLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -36),
+            mascotImageView.widthAnchor.constraint(equalToConstant: 220),
+            mascotImageView.heightAnchor.constraint(equalToConstant: 220),
         ])
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.navigateToOnboarding()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+            self?.routeNext()
         }
     }
 
@@ -66,10 +88,12 @@ class SplashViewController: UIViewController {
         gradientLayer.frame = view.bounds
     }
 
-    private func navigateToOnboarding() {
-        let onboardingVC = OnboardingViewController()
-        onboardingVC.modalPresentationStyle = .fullScreen
-        onboardingVC.modalTransitionStyle = .crossDissolve
-        present(onboardingVC, animated: true)
+    private func routeNext() {
+        // 이미 로그인돼 있으면 홈으로, 아니면 온보딩 → 로그인 흐름으로.
+        if SessionManager.isLoggedIn {
+            setWindowRoot(AppNavigationController(rootViewController: HomeViewController()))
+        } else {
+            setWindowRoot(OnboardingViewController())
+        }
     }
 }

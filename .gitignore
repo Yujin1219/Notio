@@ -55,6 +55,9 @@ fastlane/test_output
 *.cer
 *.certSigningRequest
 
+# API 키 (Gemini)
+Notio/Secrets.swift
+
 # Accio / Mint
 Dependencies/
 .accio/

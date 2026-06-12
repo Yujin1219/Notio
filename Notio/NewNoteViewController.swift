@@ -4,16 +4,44 @@
 //
 
 import UIKit
+import PDFKit
+import UniformTypeIdentifiers
+
+/// 새 노트 생성에 필요한 입력 묶음.
+struct NoteDraft {
+    let fileName: String
+    let noteTitle: String?
+    let pageCount: Int
+    let pdfData: Data?
+    let extractedText: String
+    let category: NoteCategory
+}
 
 class NewNoteViewController: UIViewController {
+
+    /// 노트 생성하기를 누르면 이 시트가 닫힌 뒤 호출된다.
+    var onSubmit: ((NoteDraft) -> Void)?
 
     // MARK: - State
 
     private var selectedCategoryIndex: Int? = nil
     private var selectedDifficultyIndex: Int? = 1 // 중급 기본 선택
+    private var selectedFileURL: URL?
+    private var selectedPageCount: Int = 0
+    private var selectedCharCount: Int = 0
+    private var selectedText: String = ""
 
     private let categoryOptions = ["전공", "교양", "자격증", "기타"]
     private let difficultyOptions = ["기초", "중급", "심화"]
+
+    /// 카테고리 칩 선택을 노트 카테고리로 매핑. (기타/미선택은 전공으로)
+    private var selectedCategory: NoteCategory {
+        switch selectedCategoryIndex {
+        case 1: return .liberal
+        case 2: return .certificate
+        default: return .major
+        }
+    }
 
     // MARK: - Gradient
 
@@ -74,7 +102,7 @@ class NewNoteViewController: UIViewController {
     }()
 
     private let characterImageView: UIImageView = {
-        let iv = UIImageView(image: UIImage(named: "ready"))
+        let iv = UIImageView(image: UIImage(named: "nio-happy"))
         iv.contentMode = .scaleAspectFit
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
@@ -82,7 +110,7 @@ class NewNoteViewController: UIViewController {
 
     private let characterTitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "강의 자료를 들려주세요"
+        label.text = "강의 자료를 올려주세요"
         label.font = UIFont.systemFont(ofSize: 20, weight: .bold)
         label.textColor = .black
         label.textAlignment = .center
@@ -92,10 +120,11 @@ class NewNoteViewController: UIViewController {
 
     private let characterSubtitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "PDF를 올려주시면 Nio가"
+        label.text = "PDF를 올려주시면\nNio가 자동으로 요약노트를 만들어드립니다."
         label.font = UIFont.systemFont(ofSize: 14, weight: .regular)
         label.textColor = .gray
         label.textAlignment = .center
+        label.numberOfLines = 0
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
@@ -127,6 +156,71 @@ class NewNoteViewController: UIViewController {
         label.textColor = .gray
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
+    }()
+
+    // Attached file card (shown after file is picked)
+    private let fileSectionStack: UIStackView = {
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        return stack
+    }()
+
+    private let attachedFileCard: UIView = {
+        let v = UIView()
+        v.backgroundColor = UIColor.white.withAlphaComponent(0.7)
+        v.layer.cornerRadius = 18
+        v.layer.shadowColor = UIColor.black.cgColor
+        v.layer.shadowOpacity = 0.05
+        v.layer.shadowOffset = CGSize(width: 0, height: 2)
+        v.layer.shadowRadius = 8
+        v.isHidden = true
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
+    private let pdfThumbnail: UIView = {
+        let v = UIView()
+        v.backgroundColor = UIColor(red: 0.96, green: 0.85, blue: 0.78, alpha: 1.0)
+        v.layer.cornerRadius = 8
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
+    private let pdfThumbLabel: UILabel = {
+        let l = UILabel()
+        l.text = "PDF"
+        l.font = UIFont.systemFont(ofSize: 12, weight: .bold)
+        l.textColor = UIColor(red: 0.55, green: 0.40, blue: 0.30, alpha: 1.0)
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private let fileNameLabel: UILabel = {
+        let l = UILabel()
+        l.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
+        l.textColor = .black
+        l.numberOfLines = 1
+        l.lineBreakMode = .byTruncatingMiddle
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private let fileMetaLabel: UILabel = {
+        let l = UILabel()
+        l.font = UIFont.systemFont(ofSize: 12, weight: .regular)
+        l.textColor = .gray
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private let removeFileButton: UIButton = {
+        let b = UIButton(type: .system)
+        let config = UIImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+        b.setImage(UIImage(systemName: "xmark", withConfiguration: config), for: .normal)
+        b.tintColor = .gray
+        b.translatesAutoresizingMaskIntoConstraints = false
+        return b
     }()
 
     // 노트 제목
@@ -210,6 +304,12 @@ class NewNoteViewController: UIViewController {
         setupChips()
 
         backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
+        removeFileButton.addTarget(self, action: #selector(removeFileTapped), for: .touchUpInside)
+        submitButton.addTarget(self, action: #selector(submitTapped), for: .touchUpInside)
+
+        let pdfTap = UITapGestureRecognizer(target: self, action: #selector(pdfButtonTapped))
+        pdfButton.addGestureRecognizer(pdfTap)
+        pdfButton.isUserInteractionEnabled = true
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
         tap.cancelsTouchesInView = false
@@ -237,10 +337,18 @@ class NewNoteViewController: UIViewController {
         characterCard.addSubview(characterTitleLabel)
         characterCard.addSubview(characterSubtitleLabel)
 
-        // PDF button
-        contentView.addSubview(pdfButton)
+        // PDF button + attached file card wrapped in a stack so layout collapses
+        contentView.addSubview(fileSectionStack)
+        fileSectionStack.addArrangedSubview(pdfButton)
+        fileSectionStack.addArrangedSubview(attachedFileCard)
         pdfButton.addSubview(pdfTitleLabel)
         pdfButton.addSubview(pdfSubtitleLabel)
+
+        attachedFileCard.addSubview(pdfThumbnail)
+        pdfThumbnail.addSubview(pdfThumbLabel)
+        attachedFileCard.addSubview(fileNameLabel)
+        attachedFileCard.addSubview(fileMetaLabel)
+        attachedFileCard.addSubview(removeFileButton)
 
         // 노트 제목
         contentView.addSubview(noteTitleSectionLabel)
@@ -271,7 +379,7 @@ class NewNoteViewController: UIViewController {
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
 
             // Nav
-            backButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
+            backButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 28),
             backButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             backButton.widthAnchor.constraint(equalToConstant: 36),
             backButton.heightAnchor.constraint(equalToConstant: 36),
@@ -294,12 +402,15 @@ class NewNoteViewController: UIViewController {
 
             characterSubtitleLabel.topAnchor.constraint(equalTo: characterTitleLabel.bottomAnchor, constant: 6),
             characterSubtitleLabel.centerXAnchor.constraint(equalTo: characterCard.centerXAnchor),
+            characterSubtitleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: characterCard.leadingAnchor, constant: 16),
+            characterSubtitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: characterCard.trailingAnchor, constant: -16),
             characterSubtitleLabel.bottomAnchor.constraint(equalTo: characterCard.bottomAnchor, constant: -24),
 
-            // PDF button
-            pdfButton.topAnchor.constraint(equalTo: characterCard.bottomAnchor, constant: 16),
-            pdfButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            pdfButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            // File section stack (holds pdfButton OR attachedFileCard)
+            fileSectionStack.topAnchor.constraint(equalTo: characterCard.bottomAnchor, constant: 16),
+            fileSectionStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            fileSectionStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+
             pdfButton.heightAnchor.constraint(equalToConstant: 60),
 
             pdfTitleLabel.topAnchor.constraint(equalTo: pdfButton.topAnchor, constant: 12),
@@ -308,8 +419,31 @@ class NewNoteViewController: UIViewController {
             pdfSubtitleLabel.topAnchor.constraint(equalTo: pdfTitleLabel.bottomAnchor, constant: 2),
             pdfSubtitleLabel.centerXAnchor.constraint(equalTo: pdfButton.centerXAnchor),
 
+            // Attached file card
+            attachedFileCard.heightAnchor.constraint(equalToConstant: 80),
+
+            pdfThumbnail.leadingAnchor.constraint(equalTo: attachedFileCard.leadingAnchor, constant: 12),
+            pdfThumbnail.centerYAnchor.constraint(equalTo: attachedFileCard.centerYAnchor),
+            pdfThumbnail.widthAnchor.constraint(equalToConstant: 48),
+            pdfThumbnail.heightAnchor.constraint(equalToConstant: 56),
+
+            pdfThumbLabel.centerXAnchor.constraint(equalTo: pdfThumbnail.centerXAnchor),
+            pdfThumbLabel.centerYAnchor.constraint(equalTo: pdfThumbnail.centerYAnchor),
+
+            removeFileButton.trailingAnchor.constraint(equalTo: attachedFileCard.trailingAnchor, constant: -16),
+            removeFileButton.centerYAnchor.constraint(equalTo: attachedFileCard.centerYAnchor),
+            removeFileButton.widthAnchor.constraint(equalToConstant: 32),
+            removeFileButton.heightAnchor.constraint(equalToConstant: 32),
+
+            fileNameLabel.leadingAnchor.constraint(equalTo: pdfThumbnail.trailingAnchor, constant: 14),
+            fileNameLabel.trailingAnchor.constraint(equalTo: removeFileButton.leadingAnchor, constant: -8),
+            fileNameLabel.topAnchor.constraint(equalTo: attachedFileCard.topAnchor, constant: 22),
+
+            fileMetaLabel.leadingAnchor.constraint(equalTo: pdfThumbnail.trailingAnchor, constant: 14),
+            fileMetaLabel.topAnchor.constraint(equalTo: fileNameLabel.bottomAnchor, constant: 4),
+
             // 노트 제목
-            noteTitleSectionLabel.topAnchor.constraint(equalTo: pdfButton.bottomAnchor, constant: 28),
+            noteTitleSectionLabel.topAnchor.constraint(equalTo: fileSectionStack.bottomAnchor, constant: 28),
             noteTitleSectionLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
 
             noteTitleTextField.topAnchor.constraint(equalTo: noteTitleSectionLabel.bottomAnchor, constant: 10),
@@ -390,6 +524,79 @@ class NewNoteViewController: UIViewController {
         view.endEditing(true)
     }
 
+    @objc private func pdfButtonTapped() {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.pdf])
+        picker.delegate = self
+        picker.allowsMultipleSelection = false
+        present(picker, animated: true)
+    }
+
+    @objc private func removeFileTapped() {
+        selectedFileURL = nil
+        selectedPageCount = 0
+        selectedCharCount = 0
+        attachedFileCard.isHidden = true
+        pdfButton.isHidden = false
+        updateSubmitButtonState()
+    }
+
+    @objc private func submitTapped() {
+        guard let url = selectedFileURL else { return }
+        let fileName = url.lastPathComponent
+        let noteTitle = noteTitleTextField.text
+        let pageCount = max(selectedPageCount, 1)
+
+        // PDF 원본 데이터 확보 (텍스트 추출이 안 되는 스캔본 대비).
+        let didAccess = url.startAccessingSecurityScopedResource()
+        let pdfData = try? Data(contentsOf: url)
+        if didAccess { url.stopAccessingSecurityScopedResource() }
+
+        let draft = NoteDraft(fileName: fileName, noteTitle: noteTitle,
+                              pageCount: pageCount, pdfData: pdfData,
+                              extractedText: selectedText, category: selectedCategory)
+        // 시트를 먼저 닫고 분석 플로우를 시작한다. (홈이 내비게이션을 이어받음)
+        let submit = onSubmit
+        dismiss(animated: true) {
+            submit?(draft)
+        }
+    }
+
+    private func updateSubmitButtonState() {
+        if selectedFileURL != nil {
+            submitButton.setTitle("노트 생성하기", for: .normal)
+            submitButton.setTitleColor(.white, for: .normal)
+        } else {
+            submitButton.setTitle("파일을 선택해주세요", for: .normal)
+            submitButton.setTitleColor(UIColor.white.withAlphaComponent(0.6), for: .normal)
+        }
+    }
+
+    private func applySelectedFile(_ url: URL) {
+        let didStartAccess = url.startAccessingSecurityScopedResource()
+        defer { if didStartAccess { url.stopAccessingSecurityScopedResource() } }
+
+        selectedFileURL = url
+        fileNameLabel.text = url.lastPathComponent
+
+        let pdfDocument = PDFDocument(url: url)
+        let pageCount = pdfDocument?.pageCount ?? 0
+        selectedPageCount = pageCount
+        selectedText = pdfDocument?.string ?? ""
+        selectedCharCount = selectedText.count
+        let sizeBytes = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int64 ?? 0
+
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useKB, .useMB]
+        formatter.countStyle = .file
+        let sizeString = formatter.string(fromByteCount: sizeBytes)
+
+        fileMetaLabel.text = "\(pageCount)페이지 · \(sizeString)"
+
+        pdfButton.isHidden = true
+        attachedFileCard.isHidden = false
+        updateSubmitButtonState()
+    }
+
     @objc private func categoryChipTapped(_ sender: UIButton) {
         selectedCategoryIndex = sender.tag
         for case let button as UIButton in categoryStackView.arrangedSubviews {
@@ -402,5 +609,15 @@ class NewNoteViewController: UIViewController {
         for case let button as UIButton in difficultyStackView.arrangedSubviews {
             updateChipButton(button, isSelected: button.tag == sender.tag)
         }
+    }
+
+}
+
+// MARK: - UIDocumentPickerDelegate
+
+extension NewNoteViewController: UIDocumentPickerDelegate {
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else { return }
+        applySelectedFile(url)
     }
 }

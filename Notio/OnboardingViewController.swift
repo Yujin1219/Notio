@@ -99,15 +99,10 @@ class OnboardingViewController: UIViewController {
         return stack
     }()
 
-    private let pageControl: UIPageControl = {
-        let pc = UIPageControl()
-        pc.numberOfPages = 3
-        pc.currentPage = 0
-        pc.currentPageIndicatorTintColor = UIColor(red: 0.22, green: 0.22, blue: 0.25, alpha: 1.0)
-        pc.pageIndicatorTintColor = UIColor(red: 0.78, green: 0.76, blue: 0.82, alpha: 1.0)
-        pc.translatesAutoresizingMaskIntoConstraints = false
-        pc.isUserInteractionEnabled = false
-        return pc
+    private let pageIndicatorView: PillPageIndicatorView = {
+        let v = PillPageIndicatorView(numberOfPages: 3)
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
     }()
 
     private let nextButton: UIButton = {
@@ -126,8 +121,19 @@ class OnboardingViewController: UIViewController {
         super.viewDidLoad()
         view.layer.insertSublayer(gradientLayer, at: 0)
         setupLayout()
+        setupSwipeGestures()
         nextButton.addTarget(self, action: #selector(nextTapped), for: .touchUpInside)
         updatePage()
+    }
+
+    private func setupSwipeGestures() {
+        let left = UISwipeGestureRecognizer(target: self, action: #selector(handleSwipe(_:)))
+        left.direction = .left
+        view.addGestureRecognizer(left)
+
+        let right = UISwipeGestureRecognizer(target: self, action: #selector(handleSwipe(_:)))
+        right.direction = .right
+        view.addGestureRecognizer(right)
     }
 
     override func viewDidLayoutSubviews() {
@@ -142,7 +148,7 @@ class OnboardingViewController: UIViewController {
         view.addSubview(stepLabel)
         view.addSubview(titleLabel)
         view.addSubview(featuresStackView)
-        view.addSubview(pageControl)
+        view.addSubview(pageIndicatorView)
         view.addSubview(nextButton)
 
         NSLayoutConstraint.activate([
@@ -166,9 +172,9 @@ class OnboardingViewController: UIViewController {
             featuresStackView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 36),
             featuresStackView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -36),
 
-            // 페이지 dots: 좌측 정렬
-            pageControl.bottomAnchor.constraint(equalTo: nextButton.topAnchor, constant: -20),
-            pageControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+            // 페이지 인디케이터: 가운데 정렬
+            pageIndicatorView.bottomAnchor.constraint(equalTo: nextButton.topAnchor, constant: -20),
+            pageIndicatorView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
 
             // 버튼: 하단
             nextButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
@@ -186,7 +192,7 @@ class OnboardingViewController: UIViewController {
         characterImageView.image = UIImage(named: page.imageName)
         stepLabel.text = page.stepLabel
         titleLabel.text = page.title
-        pageControl.currentPage = currentPage
+        pageIndicatorView.setCurrentPage(currentPage, animated: true)
 
         // features 갱신
         featuresStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
@@ -245,19 +251,101 @@ class OnboardingViewController: UIViewController {
 
     @objc private func nextTapped() {
         if currentPage < pages.count - 1 {
-            currentPage += 1
-            UIView.transition(with: view, duration: 0.3, options: .transitionCrossDissolve) {
-                self.updatePage()
-            }
+            goToPage(currentPage + 1)
         } else {
             navigateToHome()
         }
     }
 
+    @objc private func handleSwipe(_ gesture: UISwipeGestureRecognizer) {
+        switch gesture.direction {
+        case .left where currentPage < pages.count - 1:
+            goToPage(currentPage + 1)
+        case .right where currentPage > 0:
+            goToPage(currentPage - 1)
+        default:
+            break
+        }
+    }
+
+    private func goToPage(_ index: Int) {
+        currentPage = index
+        UIView.transition(with: view, duration: 0.3, options: .transitionCrossDissolve) {
+            self.updatePage()
+        }
+    }
+
     private func navigateToHome() {
-        let homeVC = HomeViewController()
-        homeVC.modalPresentationStyle = .fullScreen
-        homeVC.modalTransitionStyle = .crossDissolve
-        present(homeVC, animated: true)
+        // 온보딩을 마치면 로그인 화면으로. (로그인/회원가입 후 홈으로 진입)
+        setWindowRoot(AppNavigationController(rootViewController: LoginViewController()))
+    }
+}
+
+// MARK: - Pill Page Indicator
+
+final class PillPageIndicatorView: UIView {
+
+    private let activeColor = UIColor(red: 0.13, green: 0.12, blue: 0.18, alpha: 1.0)
+    private let inactiveColor = UIColor(red: 0.78, green: 0.76, blue: 0.78, alpha: 1.0)
+    private let dotSize: CGFloat = 8
+    private let activeWidth: CGFloat = 22
+
+    private let stack = UIStackView()
+    private var dots: [UIView] = []
+    private var widthConstraints: [NSLayoutConstraint] = []
+
+    init(numberOfPages: Int) {
+        super.init(frame: .zero)
+        stack.axis = .horizontal
+        stack.spacing = 8
+        stack.alignment = .center
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+        ])
+
+        for _ in 0..<numberOfPages {
+            let dot = UIView()
+            dot.translatesAutoresizingMaskIntoConstraints = false
+            dot.backgroundColor = inactiveColor
+            dot.layer.cornerRadius = dotSize / 2
+            let widthC = dot.widthAnchor.constraint(equalToConstant: dotSize)
+            widthC.isActive = true
+            dot.heightAnchor.constraint(equalToConstant: dotSize).isActive = true
+            widthConstraints.append(widthC)
+            dots.append(dot)
+            stack.addArrangedSubview(dot)
+        }
+
+        setCurrentPage(0, animated: false)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func setCurrentPage(_ index: Int, animated: Bool) {
+        for (i, dot) in dots.enumerated() {
+            let isActive = (i == index)
+            widthConstraints[i].constant = isActive ? activeWidth : dotSize
+            let apply = {
+                dot.backgroundColor = isActive ? self.activeColor : self.inactiveColor
+                self.layoutIfNeeded()
+            }
+            if animated {
+                UIView.animate(withDuration: 0.25,
+                               delay: 0,
+                               usingSpringWithDamping: 0.85,
+                               initialSpringVelocity: 0,
+                               options: [.curveEaseOut],
+                               animations: apply)
+            } else {
+                apply()
+            }
+        }
     }
 }

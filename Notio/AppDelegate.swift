@@ -13,7 +13,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // SwiftData 컨테이너 초기화 및 첫 실행 시 시드 데이터 주입.
+        _ = DataStore.shared
         return true
     }
 

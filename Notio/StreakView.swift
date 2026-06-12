@@ -8,8 +8,10 @@ import UIKit
 class StreakView: UIView {
 
     private let dayLabels = ["월", "화", "수", "목", "금", "토", "일"]
-    // 이번 주 학습한 요일 (0 = 월, 1 = 화, ...)
-    private let activeDays: Set<Int> = [0, 1, 2, 3, 4]
+    private var dotViews: [UIView] = []
+
+    private let activeColor = UIColor(red: 0.30, green: 0.30, blue: 0.28, alpha: 1.0)
+    private let inactiveColor = UIColor(red: 0.80, green: 0.78, blue: 0.85, alpha: 1.0)
 
     private let streakCountLabel: UILabel = {
         let label = UILabel()
@@ -48,12 +50,12 @@ class StreakView: UIView {
     }
 
     private func setupView() {
-        backgroundColor = UIColor(red: 0.96, green: 0.95, blue: 0.92, alpha: 1.0)
+        backgroundColor = UIColor.white.withAlphaComponent(0.4)
         layer.cornerRadius = 16
         clipsToBounds = true
 
-        streakCountLabel.text = "5일 연속 학습 중"
-        subtitleLabel.text = "이번 주 노트 3개 · 퀴즈 12문항"
+        streakCountLabel.text = "학습 기록을 시작해보세요"
+        subtitleLabel.text = "이번 주 노트 0개 · 퀴즈 0문항"
 
         addSubview(streakCountLabel)
         addSubview(subtitleLabel)
@@ -74,7 +76,7 @@ class StreakView: UIView {
     }
 
     private func setupDayDots() {
-        for (index, day) in dayLabels.enumerated() {
+        for day in dayLabels {
             let container = UIStackView()
             container.axis = .vertical
             container.alignment = .center
@@ -91,16 +93,21 @@ class StreakView: UIView {
             dot.widthAnchor.constraint(equalToConstant: 8).isActive = true
             dot.heightAnchor.constraint(equalToConstant: 8).isActive = true
             dot.layer.cornerRadius = 4
-
-            if activeDays.contains(index) {
-                dot.backgroundColor = UIColor(red: 0.30, green: 0.30, blue: 0.28, alpha: 1.0)
-            } else {
-                dot.backgroundColor = UIColor(red: 0.82, green: 0.80, blue: 0.76, alpha: 1.0)
-            }
+            dot.backgroundColor = inactiveColor
+            dotViews.append(dot)
 
             container.addArrangedSubview(label)
             container.addArrangedSubview(dot)
             daysStackView.addArrangedSubview(container)
+        }
+    }
+
+    /// 실제 학습 기록으로 갱신한다.
+    func configure(streak: Int, activeWeekdays: Set<Int>, weekNoteCount: Int, weekQuizCount: Int) {
+        streakCountLabel.text = streak > 0 ? "\(streak)일 연속 학습 중" : "오늘 학습을 시작해보세요"
+        subtitleLabel.text = "이번 주 노트 \(weekNoteCount)개 · 퀴즈 \(weekQuizCount)문항"
+        for (i, dot) in dotViews.enumerated() {
+            dot.backgroundColor = activeWeekdays.contains(i) ? activeColor : inactiveColor
         }
     }
 }

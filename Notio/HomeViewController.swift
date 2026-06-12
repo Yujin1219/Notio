@@ -9,14 +9,10 @@ class HomeViewController: UIViewController {
 
     // MARK: - Data
 
-    private let categories = NoteCategory.allCases
+    // 탭 순서: 전체 → 즐겨찾기 → 전공 → 교양 → 자격증
+    private let categories: [NoteCategory] = [.all, .bookmark, .major, .liberal, .certificate]
 
-    private let notes: [NoteItem] = [
-        NoteItem(title: "운영체제론 3강", keywords: "프로세스 스케줄링, 동기화, 세마포어", status: .completed, progress: 1.0),
-        NoteItem(title: "데이터베이스 2강", keywords: "정규화, ER 다이어그램, SQL 기초", status: .completed, progress: 0.7),
-        NoteItem(title: "알고리즘 5강", keywords: "동적 프로그래밍, 분할정복", status: .inProgress, progress: 0.5),
-        NoteItem(title: "네트워크 개론 1강", keywords: "OSI 7계층, TCP/IP 모델", status: .completed, progress: 1.0),
-    ]
+    private var notes: [Note] = []
 
     private var selectedCategoryIndex = 0
 
@@ -55,7 +51,7 @@ class HomeViewController: UIViewController {
 
     private let searchBar: UIView = {
         let view = UIView()
-        view.backgroundColor = UIColor(red: 0.96, green: 0.95, blue: 0.93, alpha: 1.0)
+        view.backgroundColor = UIColor.white.withAlphaComponent(0.35)
         view.layer.cornerRadius = 12
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
@@ -68,14 +64,22 @@ class HomeViewController: UIViewController {
         return iv
     }()
 
-    private let searchPlaceholder: UILabel = {
-        let label = UILabel()
-        label.text = "강의 노트 검색"
-        label.font = UIFont.systemFont(ofSize: 15, weight: .regular)
-        label.textColor = .gray
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
+    private let searchField: UITextField = {
+        let tf = UITextField()
+        tf.attributedPlaceholder = NSAttributedString(
+            string: "강의 노트 검색",
+            attributes: [.foregroundColor: UIColor.gray,
+                         .font: UIFont.systemFont(ofSize: 15, weight: .regular)])
+        tf.font = UIFont.systemFont(ofSize: 15, weight: .regular)
+        tf.textColor = .black
+        tf.clearButtonMode = .whileEditing
+        tf.returnKeyType = .search
+        tf.autocorrectionType = .no
+        tf.translatesAutoresizingMaskIntoConstraints = false
+        return tf
     }()
+
+    private var searchQuery: String = ""
 
     private let categoryScrollView: UIScrollView = {
         let sv = UIScrollView()
@@ -107,6 +111,45 @@ class HomeViewController: UIViewController {
         return tv
     }()
 
+    // 노트가 없을 때 표시하는 빈 상태.
+    private let emptyIcon: UIImageView = {
+        let iv = UIImageView(image: UIImage(systemName: "doc.text.magnifyingglass"))
+        iv.tintColor = UIColor(white: 0.0, alpha: 0.18)
+        iv.contentMode = .scaleAspectFit
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        return iv
+    }()
+
+    private let emptyTitleLabel: UILabel = {
+        let l = UILabel()
+        l.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+        l.textColor = UIColor(white: 0.35, alpha: 1.0)
+        l.textAlignment = .center
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private let emptySubtitleLabel: UILabel = {
+        let l = UILabel()
+        l.font = UIFont.systemFont(ofSize: 13, weight: .regular)
+        l.textColor = .gray
+        l.textAlignment = .center
+        l.numberOfLines = 0
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private lazy var emptyStateView: UIStackView = {
+        let s = UIStackView(arrangedSubviews: [emptyIcon, emptyTitleLabel, emptySubtitleLabel])
+        s.axis = .vertical
+        s.alignment = .center
+        s.spacing = 10
+        s.isHidden = true
+        s.translatesAutoresizingMaskIntoConstraints = false
+        s.setCustomSpacing(16, after: emptyIcon)
+        return s
+    }()
+
     private let addButton: UIButton = {
         let button = UIButton(type: .system)
         let config = UIImage.SymbolConfiguration(pointSize: 24, weight: .bold)
@@ -120,19 +163,89 @@ class HomeViewController: UIViewController {
 
     private var tableHeightConstraint: NSLayoutConstraint?
 
+    private let gradientLayer: CAGradientLayer = {
+        let layer = CAGradientLayer()
+        layer.colors = [
+            UIColor(red: 0.87, green: 0.84, blue: 0.93, alpha: 1.0).cgColor, // 라벤더
+            UIColor(red: 0.95, green: 0.93, blue: 0.89, alpha: 1.0).cgColor  // 베이지
+        ]
+        layer.locations = [0.0, 1.0]
+        layer.startPoint = CGPoint(x: 0.5, y: 0.0)
+        layer.endPoint = CGPoint(x: 0.5, y: 1.0)
+        return layer
+    }()
+
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 0.97, green: 0.96, blue: 0.94, alpha: 1.0)
+        view.layer.insertSublayer(gradientLayer, at: 0)
         setupLayout()
         setupCategories()
         setupTableView()
+        addButton.addTarget(self, action: #selector(addButtonTapped), for: .touchUpInside)
+        menuButton.addTarget(self, action: #selector(menuTapped), for: .touchUpInside)
+        searchField.addTarget(self, action: #selector(searchChanged(_:)), for: .editingChanged)
+        searchField.addTarget(self, action: #selector(searchReturn), for: .editingDidEndOnExit)
+        reloadNotes()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 노트 생성/삭제 후 돌아왔을 때 최신 상태로 갱신.
+        reloadNotes()
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        gradientLayer.frame = view.bounds
         updateTableHeight()
+    }
+
+    private func reloadNotes() {
+        let all = DataStore.shared.fetchNotes()
+        let selected = categories[selectedCategoryIndex]
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        if !query.isEmpty {
+            // 검색 중에는 카테고리 무시하고 전체에서 제목·키워드로 찾는다.
+            notes = all.filter {
+                $0.title.lowercased().contains(query) || $0.keywords.lowercased().contains(query)
+            }
+        } else {
+            switch selected {
+            case .all:        notes = all
+            case .bookmark:   notes = all.filter { $0.isFavorite }
+            default:          notes = all.filter { $0.category == selected }
+            }
+        }
+
+        emptyStateView.isHidden = !notes.isEmpty
+        if notes.isEmpty {
+            if !query.isEmpty {
+                emptyTitleLabel.text = "검색 결과가 없어요"
+                emptySubtitleLabel.text = "‘\(searchQuery)’와 일치하는 노트가 없어요"
+            } else {
+                switch selected {
+                case .all:
+                    emptyTitleLabel.text = "아직 노트가 없어요"
+                    emptySubtitleLabel.text = "아래 + 버튼을 눌러 첫 노트를 만들어보세요"
+                case .bookmark:
+                    emptyTitleLabel.text = "즐겨찾기한 노트가 없어요"
+                    emptySubtitleLabel.text = "노트 요약 화면의 ‘저장’을 누르면 여기에 모여요"
+                default:
+                    emptyTitleLabel.text = "이 분류에 노트가 없어요"
+                    emptySubtitleLabel.text = "‘\(selected.rawValue)’ 분류의 노트가 아직 없어요"
+                }
+            }
+        }
+
+        let stats = DataStore.shared.streakStats()
+        streakView.configure(streak: stats.streak, activeWeekdays: stats.activeWeekdays,
+                             weekNoteCount: stats.weekNoteCount, weekQuizCount: stats.weekQuizCount)
+
+        tableView.reloadData()
+        view.setNeedsLayout()
     }
 
     // MARK: - Setup
@@ -145,11 +258,12 @@ class HomeViewController: UIViewController {
         contentView.addSubview(menuButton)
         contentView.addSubview(searchBar)
         searchBar.addSubview(searchIcon)
-        searchBar.addSubview(searchPlaceholder)
+        searchBar.addSubview(searchField)
         contentView.addSubview(categoryScrollView)
         categoryScrollView.addSubview(categoryStackView)
         contentView.addSubview(streakView)
         contentView.addSubview(tableView)
+        contentView.addSubview(emptyStateView)
 
         view.addSubview(addButton)
 
@@ -186,8 +300,9 @@ class HomeViewController: UIViewController {
             searchIcon.widthAnchor.constraint(equalToConstant: 18),
             searchIcon.heightAnchor.constraint(equalToConstant: 18),
 
-            searchPlaceholder.centerYAnchor.constraint(equalTo: searchBar.centerYAnchor),
-            searchPlaceholder.leadingAnchor.constraint(equalTo: searchIcon.trailingAnchor, constant: 8),
+            searchField.centerYAnchor.constraint(equalTo: searchBar.centerYAnchor),
+            searchField.leadingAnchor.constraint(equalTo: searchIcon.trailingAnchor, constant: 8),
+            searchField.trailingAnchor.constraint(equalTo: searchBar.trailingAnchor, constant: -12),
 
             // Category ScrollView
             categoryScrollView.topAnchor.constraint(equalTo: searchBar.bottomAnchor, constant: 14),
@@ -212,6 +327,15 @@ class HomeViewController: UIViewController {
             tableView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
+
+            // Empty state (테이블이 비었을 때 그 자리에 표시)
+            emptyStateView.topAnchor.constraint(equalTo: streakView.bottomAnchor, constant: 60),
+            emptyStateView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            emptyStateView.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 40),
+            emptyStateView.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -40),
+
+            emptyIcon.widthAnchor.constraint(equalToConstant: 52),
+            emptyIcon.heightAnchor.constraint(equalToConstant: 52),
 
             // Add Button
             addButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
@@ -253,7 +377,7 @@ class HomeViewController: UIViewController {
             button.backgroundColor = UIColor(red: 0.22, green: 0.22, blue: 0.20, alpha: 1.0)
             button.setTitleColor(.white, for: .normal)
         } else {
-            button.backgroundColor = UIColor(red: 0.93, green: 0.92, blue: 0.89, alpha: 1.0)
+            button.backgroundColor = UIColor.white.withAlphaComponent(0.45)
             button.setTitleColor(.darkGray, for: .normal)
         }
     }
@@ -268,11 +392,77 @@ class HomeViewController: UIViewController {
 
     // MARK: - Actions
 
+    @objc private func searchChanged(_ sender: UITextField) {
+        searchQuery = sender.text ?? ""
+        reloadNotes()
+    }
+
+    @objc private func searchReturn() {
+        searchField.resignFirstResponder()
+    }
+
     @objc private func categoryTapped(_ sender: UIButton) {
         selectedCategoryIndex = sender.tag
         for case let button as UIButton in categoryStackView.arrangedSubviews {
             updateCategoryButton(button, isSelected: button.tag == selectedCategoryIndex)
         }
+        reloadNotes()
+    }
+
+    @objc private func menuTapped() {
+        let nickname = DataStore.shared.user(email: SessionManager.currentEmail ?? "")?.nickname
+        let sheet = UIAlertController(
+            title: nickname.map { "\($0) 님" },
+            message: SessionManager.currentEmail,
+            preferredStyle: .actionSheet)
+        sheet.addAction(UIAlertAction(title: "로그아웃", style: .destructive) { [weak self] _ in
+            SessionManager.logout()
+            self?.setWindowRoot(AppNavigationController(rootViewController: LoginViewController()))
+        })
+        sheet.addAction(UIAlertAction(title: "취소", style: .cancel))
+        if let pop = sheet.popoverPresentationController {
+            pop.sourceView = menuButton
+            pop.sourceRect = menuButton.bounds
+        }
+        present(sheet, animated: true)
+    }
+
+    @objc private func addButtonTapped() {
+        let vc = NewNoteViewController()
+        vc.onSubmit = { [weak self] draft in
+            self?.startAnalysis(draft: draft)
+        }
+        if let sheet = vc.sheetPresentationController {
+            sheet.detents = [.large()]
+            sheet.prefersGrabberVisible = true
+        }
+        present(vc, animated: true)
+    }
+
+    /// 새 노트 작성 시트가 닫힌 뒤 바로 Gemini 분석을 모달로 띄우고,
+    /// 끝나면 결과를 저장한 뒤 요약 화면을 push 한다.
+    private func startAnalysis(draft: NoteDraft) {
+        let progressVC = AnalysisProgressViewController(draft: draft)
+        progressVC.onComplete = { [weak self] title, content in
+            guard let self else { return }
+            // 생성된 콘텐츠를 JSON으로 저장한다.
+            let json = (try? JSONEncoder().encode(content))
+                .flatMap { String(data: $0, encoding: .utf8) }
+            let keywords = content.keywords.prefix(3).map(\.title).joined(separator: ", ")
+            let trimmedSource = draft.extractedText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let note = DataStore.shared.addNote(
+                title: title,
+                keywords: keywords.isEmpty ? "AI 생성 노트" : keywords,
+                status: .inProgress, progress: 0.0, category: draft.category,
+                contentJSON: json,
+                sourceText: trimmedSource.isEmpty ? nil : trimmedSource)
+
+            self.dismiss(animated: true) {
+                self.navigationController?.pushViewController(
+                    SummaryViewController(note: note, justCreated: true), animated: true)
+            }
+        }
+        present(progressVC, animated: true)
     }
 }
 
@@ -290,6 +480,27 @@ extension HomeViewController: UITableViewDataSource, UITableViewDelegate {
         }
         cell.configure(with: notes[indexPath.row])
         return cell
+    }
+
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        let note = notes[indexPath.row]
+        let summary = SummaryViewController(note: note)
+        navigationController?.pushViewController(summary, animated: true)
+    }
+
+    func tableView(_ tableView: UITableView,
+                   trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath)
+        -> UISwipeActionsConfiguration? {
+        let delete = UIContextualAction(style: .destructive, title: "삭제") { [weak self] _, _, done in
+            guard let self else { done(false); return }
+            let note = self.notes.remove(at: indexPath.row)
+            DataStore.shared.delete(note)
+            tableView.deleteRows(at: [indexPath], with: .automatic)
+            self.view.setNeedsLayout()
+            done(true)
+        }
+        return UISwipeActionsConfiguration(actions: [delete])
     }
 
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {

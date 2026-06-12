@@ -47,7 +47,7 @@ class NoteCardCell: UITableViewCell {
 
     private let progressBarBackground: UIView = {
         let view = UIView()
-        view.backgroundColor = UIColor(red: 0.92, green: 0.91, blue: 0.88, alpha: 1.0)
+        view.backgroundColor = UIColor(red: 0.90, green: 0.89, blue: 0.93, alpha: 1.0)
         view.layer.cornerRadius = 2
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
@@ -120,7 +120,7 @@ class NoteCardCell: UITableViewCell {
         ])
     }
 
-    func configure(with item: NoteItem) {
+    func configure(with item: Note) {
         titleLabel.text = item.title
         keywordsLabel.text = item.keywords
 
