@@ -1,12 +1,12 @@
 # 📚 Notio
+<img width="1277" height="716" alt="image" src="https://github.com/user-attachments/assets/01767cc8-a8b7-462f-9a21-e6a8965d15fb" />
 
 > 강의 노트(PDF)를 올리면 AI가 핵심 요약과 예상 문제를 만들어주는 학습 도우미 iOS 앱
 
-마스코트 **Nio**와 함께, "올리기만 하면" 요약 · 퀴즈 · 오답 관리까지 한 번에 끝내고 능동적인 복습 사이클을 자동화합니다.
-
----
-
 ## 🎯 서비스 소개
+<img width="1278" height="716" alt="image" src="https://github.com/user-attachments/assets/b25dc46d-9d80-45a1-a6c7-5e369064502f" />
+<img width="1281" height="719" alt="image" src="https://github.com/user-attachments/assets/0d03798a-a2f2-4cdb-b431-5bcb2744714d" />
+<img width="1274" height="716" alt="image" src="https://github.com/user-attachments/assets/49276dc4-f6bb-49d5-8ca3-7ed07b6a963e" />
 
 - **무엇을** — PDF 강의 자료를 업로드하면 Gemini AI가 텍스트를 분석해 **핵심 요약 · 키워드 · 예상 문제**를 자동 생성합니다.
 - **왜** — 방대한 강의 자료를 직접 요약·정리하고 문제를 만들어 복습하는 데 드는 시간과 노력을 줄이기 위해.
@@ -18,42 +18,56 @@
 ## ✨ 주요 기능
 
 ### 계정
+<img width="1280" height="715" alt="image" src="https://github.com/user-attachments/assets/5e0ac98c-11a3-4a84-b452-40a1e55f1fef" />
+
 - 이메일 · 비밀번호 **로컬 회원가입/로그인**, 유효성 검사 + 이메일 중복 확인
 - 비밀번호 **SHA-256 해시** 저장, 약관 동의 UI
 - **유저별 데이터 완전 분리** (내 노트만 조회)
 
 ### 노트 생성 (AI 분석)
+<img width="1278" height="717" alt="image" src="https://github.com/user-attachments/assets/0cf62ade-c31a-4b72-940e-e8136ded2807" />
+<img width="1280" height="716" alt="image" src="https://github.com/user-attachments/assets/2a9450f4-d686-4bea-99f3-154bbd91ef70" />
+
 - PDF 업로드 → **PDFKit 텍스트 추출** → Gemini 분석
 - 자동 생성: 노트 제목 · 핵심 개념 요약 · 키워드
 - 분석 진행 단계 표시 + **도중 취소** 가능
 
 ### 요약 (구조화)
+<img width="1279" height="719" alt="image" src="https://github.com/user-attachments/assets/c3e76c65-876a-4a94-82aa-6c52c6ce337d" />
+<img width="1279" height="717" alt="image" src="https://github.com/user-attachments/assets/3f3e32fb-0780-412f-89de-17bcb42fa102" />
+
 - 개념별 요약 카드 + 상세 페이지(**정의 / 핵심 포인트 목록 / 비교 표**)
 - 핵심 키워드 · 관련 용어 정리
 - 업로드 **원문 텍스트** 열람
 
 ### 퀴즈 (온디맨드 생성)
+<img width="1279" height="717" alt="image" src="https://github.com/user-attachments/assets/4d4c75fe-7297-4792-a5c2-e02afa959019" />
+
 - **난이도(상·중·하)** 와 **문제 수**를 직접 선택
 - 난이도에 따라 AI가 실제로 다른 수준으로 출제
 - **객관식(4지선다) + 주관식(단답형)** 혼합, 주관식은 유연한 채점
 - 정답 텍스트 역매칭으로 정답 인덱스 보정, "이미 낸 문제 회피"로 매번 새로운 문제
 
 ### 복습 관리
+<img width="1276" height="717" alt="image" src="https://github.com/user-attachments/assets/417e4923-c846-40ef-81f2-f2f1045eb7a2" />
+<img width="1281" height="719" alt="image" src="https://github.com/user-attachments/assets/87fe3281-5f08-47db-a512-954911d557a2" />
+
 - 퀴즈 응시 **기록 · 통계**(정답률 · 푼 문제 · 오답 수)
 - 응시 내역 조회 + **문항별 내 답/정답 상세**
 - **오답노트** 자동 수집 → 틀린 문제만 **다시 풀기**
 
 ### 학습 동기 부여
+<img width="1279" height="718" alt="image" src="https://github.com/user-attachments/assets/220c6642-cf4b-4176-86d9-0b511d25a9fa" />
+
 - 노트별 **학습률 · 상태**(진행중/완료)가 퀴즈 성취도에 따라 자동 갱신
 - **연속 학습일(스트릭)** 과 이번 주 학습량
-
-### 편의
 - 노트 **검색**(제목·키워드), **카테고리 필터**(전공·교양·자격증), **즐겨찾기**
 - **토스트** 알림, 빈 상태 안내, 로딩 인디케이터, 가장자리 스와이프 뒤로가기
 
 ---
 
 ## 🛠 기술 스택
+<img width="1277" height="716" alt="image" src="https://github.com/user-attachments/assets/6b2615d8-cd05-4a38-b7a2-43752096fbc8" />
 
 | 영역 | 사용 기술 |
 |---|---|
@@ -68,6 +82,7 @@
 ---
 
 ## 🧱 아키텍처 & 코드 구조
+<img width="1276" height="714" alt="image" src="https://github.com/user-attachments/assets/6a70fd88-c86d-4470-8a24-229dcac1914a" />
 
 UIKit 기반의 **MVC + 서비스 레이어** 구조입니다. 화면 계층 이동은 `UINavigationController`(push/pop), 플로우 경계(스플래시→온보딩→로그인→홈)는 윈도우 루트 교체로 처리해 이전 화면을 메모리에서 해제합니다.
 
