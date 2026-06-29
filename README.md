@@ -194,8 +194,3 @@ Notio/
 └── 퀴즈                NewQuizConfig / QuizHistoryDetail / WrongAnswerNotebook / RetryQuiz
 ```
 *(파일은 단일 `Notio/` 그룹에 위치하며, 위 분류는 역할 기준입니다.)*
-
----
-## 🎥 Video
-
-[![발표 유튜브 영상](https://img.youtube.com/vi/Jg2hNw70A1A/maxresdefault.jpg)](https://youtu.be/Jg2hNw70A1A)
